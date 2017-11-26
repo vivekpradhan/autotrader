@@ -1,4 +1,4 @@
-from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, GDAXOrderBook, GDAXRawOrders
+from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, GDAXOrderBook, GDAXRawOrders,GADXHistoricalDataOneSecondOHLC,historicalDataProgramState
 from secrets import *
 from coinbase.wallet.client import Client
 import gdax
@@ -9,7 +9,7 @@ import datetime
 import urllib, json
 from utils import *
 import time
-
+import pdb
 
 
 
@@ -140,3 +140,127 @@ class myWebsocketClient(gdax.WebsocketClient):
             self.batch_timer = time.time()
     def on_close(self):
         self.commit_batch()
+
+def gdax_historic_retry(public_client):
+    try:
+        alist = public_client.get_product_historic_rates(i, start = startx, end = endx, granularity = 1)
+        return alist,public_client
+    except:
+        time.sleep(30)
+        public_client = gdax.PublicClient()
+        alist,public_client = gdax_historic_retry(public_client)
+        return alist,public_client
+
+
+def get_gdax_historical_data():
+    """historical data of currencies from GADAX
+    Args:
+        days(integer): number of days from today the historical data is to be pulled
+        start (datetime in iso8601 format) (Optional): Starting date from which historical data is to be pulled. If not given, 
+        it will take today's date by default
+    Returns:
+        None
+        updates the SQL GDAXHistorical table in the database
+    """
+    
+    start = None
+    while not start:
+        start,end,tid = getStartAndEndHistoric()
+        if not start:
+            time.sleep(60)
+        #Todo: change this to 1min
+    firsttimestamp = start
+    engine = sa.create_engine(sql_address)
+    products =  ["LTC-USD","LTC-BTC","ETH-USD","ETH-BTC","BTC-USD"]
+    public_client = gdax.PublicClient()
+    deltat = datetime.timedelta(seconds = 200)
+    timewindows = []
+    while end - start > datetime.timedelta(seconds=0):
+        if start + deltat > end:
+            endx = end
+        else:
+            endx = start + deltat
+        timewindows.append([start,endx])
+        start += deltat
+    results = []
+    total = len(timewindows)
+    current_idx = 0
+    timeold = time.time()
+    numofqueries = 0
+    engine = sa.create_engine(sql_address)
+    Base.metadata.bind = engine
+    DBSession = sa.orm.sessionmaker()
+    DBSession.bind = engine
+    session = DBSession()
+    for startx,endx in timewindows:
+
+        current_idx += 1
+        for i in products:
+            repeat = True
+            while repeat:
+
+                #delay if ratelimts are close
+                if numofqueries < 3:
+                    while time.time() - timeold < 1:
+                        time.sleep(0.05)
+                    
+                    timeold = time.time()
+                    numofqueries = 0
+                try:
+                    alist = public_client.get_product_historic_rates(i, start = startx, end = endx, granularity = 1)
+                except:
+                    time.sleep(30)
+                    public_client = gdax.PublicClient()
+                    alist = public_client.get_product_historic_rates(i, start = startx, end = endx, granularity = 1)
+
+                alist = public_client.get_product_historic_rates(i, start = startx, end = endx, granularity = 1)
+
+                numofqueries += 1
+
+                #rate limit exceeded has 'message' as dict.
+                if not 'message' in alist:
+                    repeat = False
+                    for a in alist:
+                        a[0] =  datetime.datetime.fromtimestamp(float(a[0]))
+                        tmp = i.split('-')
+                        d = dict(coin = tmp[0], currency = tmp[1], timestamp = a[0], low=a[1], high=a[2], open=a[3], close=a[4], volume=a[5])
+                        results.append(d)
+                        lasttimestamp = a[0]
+
+                        #upload with batch size of 10000
+                        if len(results) > 10000:
+                            engine.execute(
+                                GADXHistoricalDataOneSecondOHLC.__table__.insert(),
+                                results
+                            )
+                            results = []
+                            
+                            update = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.transaction_id == tid,historicalDataProgramState.entry_type == 'update')).first()
+                            if update:
+                                update.end = lasttimestamp
+                                session.commit()
+                            else:
+                                new_update = historicalDataProgramState(entry_type = 'update',transaction_id = tid,start=firsttimestamp,end=lasttimestamp,platform='GDAX',status='incomplete')
+                                session.add(new_update)
+                                session.commit()
+    if len(results) > 0:
+        engine.execute(
+            GADXHistoricalDataOneSecondOHLC.__table__.insert(),
+            results
+        )
+        results = []
+        
+        update = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.transaction_id == tid,historicalDataProgramState.entry_type == 'update')).first()
+        if update:
+            update.end = lasttimestamp
+            session.commit()
+        else:
+            new_update = historicalDataProgramState(entry_type = 'update',transaction_id = tid,start=firsttimestamp,end=lasttimestamp,platform='GDAX',status='incomplete')
+            session.add(new_update)
+            session.commit()
+
+    update = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.transaction_id == tid,historicalDataProgramState.entry_type == 'update')).first()
+    update.status='complete'
+    order = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.transaction_id == tid,historicalDataProgramState.entry_type == 'order')).first()
+    order.status='complete'
+    session.commit()

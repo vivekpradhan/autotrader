@@ -1,0 +1,9 @@
+[program:gdaxHistory]
+command=python -u runtask.py historicalGDAX
+directory=/home/ubuntu/autotrader/src
+stdout_logfile=/home/ubuntu/autotrader/src/supervisorConf/gdaxHistory.log
+redirect_stderr=true
+autostart=true
+autorestart=true
+startretries=10
+user=ubuntu

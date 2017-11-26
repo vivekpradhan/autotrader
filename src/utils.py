@@ -1,10 +1,11 @@
-from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, ViewMyOrders,DataErrors
+from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, GDAXOrderBook, GDAXRawOrders,GADXHistoricalDataOneSecondOHLC,historicalDataProgramState,DataErrors
 from secrets import *
 from base import Base
 import sqlalchemy as sa
 import pandas as pd
 import datetime
 import dateutil.parser
+import uuid
 
 
 
@@ -21,6 +22,39 @@ def date2timestamp(date):
 def create_dbs():
     engine = sa.create_engine(sql_address)
     Base.metadata.create_all(engine)
+
+def getStartAndEndHistoric():
+    engine = sa.create_engine(sql_address)
+    Base.metadata.bind = engine
+    DBSession = sa.orm.sessionmaker()
+    DBSession.bind = engine
+    session = DBSession()
+    update = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.status == 'incomplete',historicalDataProgramState.entry_type == 'update')).first()
+    if update:
+        start = update.end + datetime.timedelta(seconds=1)
+        order = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.transaction_id == update.transaction_id,historicalDataProgramState.entry_type == 'order')).first()
+        end = order.end
+        return start,end,order.transaction_id
+    order = session.query(historicalDataProgramState).filter(sa.and_(historicalDataProgramState.status == 'incomplete',historicalDataProgramState.entry_type == 'order')).first()
+    if order:
+        start = order.start
+        end = order.end
+        return start,end,order.transaction_id
+    return None,None,None
+
+def insertHistoricJob(start, end):
+    tid = str(uuid.uuid4())
+    start = dateutil.parser.parse(start)
+    end = dateutil.parser.parse(end)
+    engine = sa.create_engine(sql_address)
+    Base.metadata.bind = engine
+    DBSession = sa.orm.sessionmaker()
+    DBSession.bind = engine
+    session = DBSession()
+    new_order = historicalDataProgramState(entry_type = 'order',transaction_id = tid,start=start,end=end,platform='GDAX',status='incomplete')
+    session.add(new_order)
+    session.commit()
+
 
 def getEntryFromRow(row,classname):
     dbentry = globals()[classname]()

@@ -1,5 +1,5 @@
 import sys
-from data_collection import coinbase_orders,gdax_orders,myWebsocketClient,get_gdax_orderbook
+from data_collection import coinbase_orders,gdax_orders,myWebsocketClient,get_gdax_orderbook,get_gdax_historical_data
 from utils import errorlogger
 import time
 
@@ -47,5 +47,16 @@ elif cmd == 'updateMyOrders':
             time.sleep(time_delta*60)
         except Exception,e:
             errorlogger('updateMyOrders', 'Failed Update', config, str(e))
+#call as historicalGDAX_starttime_endtime
+#replace spaces with #
+#for example
+#historicalGDAX_2017-08-01#00:00:00_2017-11-21#00:00:00
+elif cmd == 'historicalGDAX':
+    splitx = config.split('_')
+    try:
+        get_gdax_historical_data()
+    except Exception,e:
+        errorlogger('historicalGDAX','failed update',config, str(e))
+
 else:
 	print "unrecognized CMD"

@@ -104,4 +104,25 @@ class DataErrors(Base):
     timestamp = sa.Column(sa.DateTime, nullable=False)
     argv = sa.Column(sa.String(200), nullable=False)
     errortext = sa.Column(sa.Text,nullable=False)
+    
+class GADXHistoricalDataOneSecondOHLC(Base):
+    __tablename__ = 'oneSecOHLCGdax'
+    id = sa.Column(sa.Integer, primary_key=True)
+    coin = sa.Column(sa.String(10), nullable=False)
+    currency = sa.Column(sa.String(10), nullable=False) 
+    timestamp = sa.Column(sa.DateTime,nullable=False)
+    low = sa.Column(sa.Float,nullable=False)
+    high = sa.Column(sa.Float,nullable=False)
+    open = sa.Column(sa.Float,nullable=False)
+    close = sa.Column(sa.Float,nullable=False)
+    volume = sa.Column(sa.Float,nullable=False)
 
+class historicalDataProgramState(Base):
+    __tablename__='historicalDataProgramState'
+    id = sa.Column(sa.Integer, primary_key=True)
+    entry_type = sa.Column(sa.String(10), nullable=False)
+    transaction_id = sa.Column(sa.String(50), nullable=False)
+    start = sa.Column(sa.DateTime,nullable=False)
+    end = sa.Column(sa.DateTime,nullable=False)
+    platform = sa.Column(sa.String(10), nullable=False)
+    status = sa.Column(sa.String(10), nullable=False)

@@ -1,4 +1,4 @@
-from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, GDAXOrderBook, GDAXRawOrders,GADXHistoricalDataOneSecondOHLC,historicalDataProgramState
+from sqlalchemy_declarative import CoinbaseOrders, GDAXOrders, BitfinexOrders, GDAXOrderBook, GDAXRawOrders,GADXHistoricalDataOneSecondOHLC,historicalDataProgramState,GDAXRawOrdersNew
 from secrets import *
 from coinbase.wallet.client import Client
 import gdax
@@ -122,7 +122,7 @@ class myWebsocketClient(gdax.WebsocketClient):
             if len(self.batch_updates) > 0:
                 engine = sa.create_engine(sql_address)
                 engine.execute(
-                GDAXRawOrders.__table__.insert(),
+                GDAXRawOrdersNew.__table__.insert(),
                 self.batch_updates
                 )
         except Exception,e:

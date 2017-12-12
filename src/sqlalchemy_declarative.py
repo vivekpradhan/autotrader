@@ -96,6 +96,23 @@ class GDAXRawOrders(Base):
     client_oid = sa.Column(sa.String(50), nullable=False)
     timestamp = sa.Column(sa.DateTime, nullable=False)
 
+class GDAXRawOrdersNew(Base):
+    __tablename__ = 'rawOrdersGDAXNew'
+
+    id = sa.Column(sa.BigInteger, primary_key=True)
+    sequence_id = sa.Column(sa.BigInteger, nullable = False)
+    trade_id = sa.Column(sa.BigInteger, nullable = False)
+    entry_type = sa.Column(sa.String(10), nullable = False)
+    order_type_or_reason = sa.Column(sa.String(10), nullable = False)
+    side = sa.Column(sa.String(10), nullable = False)
+    coin = sa.Column(sa.String(10), nullable=False)
+    currency = sa.Column(sa.String(10), nullable=False)
+    amount = sa.Column(sa.Float, nullable=False)
+    cost = sa.Column(sa.Float, nullable=False)
+    transaction_id = sa.Column(sa.String(50), nullable=False)
+    client_oid = sa.Column(sa.String(50), nullable=False)
+    timestamp = sa.Column(sa.DateTime, nullable=False, index=True)
+
 class DataErrors(Base):
     __tablename__ = 'dataErrors'
     id = sa.Column(sa.Integer, primary_key=True)
